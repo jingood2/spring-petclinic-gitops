@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: ConfigMap
+data:
+  index.js: var http = require('http'); var port = process.argv[2]; http.createServer(function (req, res) { res.write('Hello World!'); res.end();}).listen(port);
+immutable: false
+metadata:
+  name: hello-app-dev-appdata-c8df5e72
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: hello-app
+  name: hello-app-dev-deployment-c894979c
+spec:
+  minReadySeconds: 0
+  progressDeadlineSeconds: 120
+  replicas: 1
+  selector:
+    matchLabels:
+      cdk8s.io/metadata.addr: hello-app-dev-Deployment-c8f3ed83
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        cdk8s.io/metadata.addr: hello-app-dev-Deployment-c8f3ed83
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - command:
+            - node
+            - index.js
+            - "80"
+          image: node:14.4.0-alpine3.12
+          imagePullPolicy: Always
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /
+              port: 80
+              scheme: HTTP
+          name: main
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /
+              port: 80
+              scheme: HTTP
+          resources:
+            limits:
+              memory: 128Mi
+            requests:
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 26000
+            runAsNonRoot: true
+            runAsUser: 25000
+          startupProbe:
+            failureThreshold: 3
+            tcpSocket:
+              port: 80
+          volumeMounts:
+            - mountPath: /var/lib/app
+              name: configmap-hello-app-dev-appdata-c8df5e72
+          workingDir: /var/lib/app
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext:
+        fsGroupChangePolicy: Always
+        runAsNonRoot: true
+      setHostnameAsFQDN: false
+      volumes:
+        - configMap:
+            name: hello-app-dev-appdata-c8df5e72
+          name: configmap-hello-app-dev-appdata-c8df5e72
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-app-dev-deployment-service-c80498f4
+spec:
+  externalIPs: []
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    cdk8s.io/metadata.addr: hello-app-dev-Deployment-c8f3ed83
+  type: LoadBalancer

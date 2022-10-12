@@ -43,6 +43,6 @@ junit.xml
 !/tsconfig.dev.json
 !/src/
 /lib
-/dist/
+#/dist/
 !/.eslintrc.json
 !/cdk8s.yaml
