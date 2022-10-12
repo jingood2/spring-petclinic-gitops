@@ -5,8 +5,12 @@ import * as kplus from 'cdk8s-plus-22';
 import { Construct } from 'constructs';
 import { envVars } from './lib/env-vars';
 
+interface MyChartProps extends ChartProps {
+  stage: string;
+}
+
 export class MyChart extends Chart {
-  constructor(scope: Construct, id: string, props: ChartProps = { }) {
+  constructor(scope: Construct, id: string, props: MyChartProps ) {
     super(scope, id, props);
 
     const label = { app: envVars.SERVICE_NAME };
@@ -23,7 +27,7 @@ export class MyChart extends Chart {
     // lets create a deployment to run a few instances of a Pod
     const deployment = new kplus.Deployment(this, 'Deployment', {
       metadata: { labels: label },
-      replicas: envVars.REPLICAS,
+      replicas: props.stage == 'dev' ? envVars.mapping.dev.REPLICAS : envVars.mapping.prod.REPLICAS,
       progressDeadline: cdk8s.Duration.seconds(120),
     });
 
@@ -46,10 +50,14 @@ export class MyChart extends Chart {
     // finally, we expose the deployment as a load balancer service and make it run
     deployment.exposeViaService({ serviceType: kplus.ServiceType.LOAD_BALANCER });
 
+    // ingress
+
     app.synth();
   }
 }
 
 const app = new App();
-new MyChart(app, envVars.SERVICE_NAME);
+new MyChart(app, `${envVars.SERVICE_NAME}-dev`, { stage: 'dev' });
+new MyChart(app, `${envVars.SERVICE_NAME}-staging`, { stage: 'staging' });
+new MyChart(app, `${envVars.SERVICE_NAME}-prod`, { stage: 'prod' });
 app.synth();
