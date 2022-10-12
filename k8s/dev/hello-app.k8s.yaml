@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+data:
+  index.js: var http = require('http'); var port = process.argv[2]; http.createServer(function (req, res) { res.write('Hello World!'); res.end();}).listen(port);
+immutable: false
+metadata:
+  name: hello-app-appdata-c88a8c0c
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: hello-app
+  name: hello-app-deployment-c8292df4
+spec:
+  minReadySeconds: 0
+  progressDeadlineSeconds: 120
+  replicas: 1
+  selector:
+    matchLabels:
+      cdk8s.io/metadata.addr: hello-app-Deployment-c8a9b7c2
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        cdk8s.io/metadata.addr: hello-app-Deployment-c8a9b7c2
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - command:
+            - node
+            - index.js
+            - "80"
+          image: node:14.4.0-alpine3.12
+          imagePullPolicy: Always
+          name: main
+          ports:
+            - containerPort: 80
+          resources:
+            limits:
+              cpu: 1500m
+              memory: 2048Mi
+            requests:
+              cpu: 1000m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 26000
+            runAsNonRoot: true
+            runAsUser: 25000
+          startupProbe:
+            failureThreshold: 3
+            tcpSocket:
+              port: 80
+          volumeMounts:
+            - mountPath: /var/lib/app
+              name: configmap-hello-app-appdata-c88a8c0c
+          workingDir: /var/lib/app
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext:
+        fsGroupChangePolicy: Always
+        runAsNonRoot: true
+      setHostnameAsFQDN: false
+      volumes:
+        - configMap:
+            name: hello-app-appdata-c88a8c0c
+          name: configmap-hello-app-appdata-c88a8c0c
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-app-deployment-service-c8e38c3b
+spec:
+  externalIPs: []
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    cdk8s.io/metadata.addr: hello-app-Deployment-c8a9b7c2
+  type: LoadBalancer
