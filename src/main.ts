@@ -1,5 +1,5 @@
 //import path from 'path';
-import { App, Chart, ChartProps } from 'cdk8s';
+import { App, Chart, ChartProps, Size } from 'cdk8s';
 import * as cdk8s from 'cdk8s';
 import * as kplus from 'cdk8s-plus-22';
 import { Construct } from 'constructs';
@@ -35,6 +35,9 @@ export class MyChart extends Chart {
       command: ['node', 'index.js', `${port}`],
       port: port,
       workingDir: appPath,
+      resources: { memory: { request: Size.mebibytes(64), limit: Size.mebibytes(128) } },
+      readiness: kplus.Probe.fromHttpGet('/'),
+      liveness: kplus.Probe.fromHttpGet('/'),
     });
 
     // make the app accessible to the container
