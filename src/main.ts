@@ -1,37 +1,52 @@
-import { App, Chart, ChartProps, ApiObject } from 'cdk8s';
+//import path from 'path';
+import { App, Chart, ChartProps } from 'cdk8s';
+import * as cdk8s from 'cdk8s';
+import * as kplus from 'cdk8s-plus-22';
 import { Construct } from 'constructs';
+import { envVars } from './lib/env-vars';
 
 export class MyChart extends Chart {
   constructor(scope: Construct, id: string, props: ChartProps = { }) {
     super(scope, id, props);
 
-    const label = { app: 'hello-k8s' };
+    const label = { app: envVars.SERVICE_NAME };
+
+    const appData = new kplus.ConfigMap(this, 'AppData');
+    //appData.addDirectory(path.join(__dirname, '.'));
+    appData.addData('index.js',
+      "var http = require('http'); var port = process.argv[2]; http.createServer(function (req, res) { res.write('Hello World!'); res.end();}).listen(port);");
 
 
-    new ApiObject(this, 'deployment', {
-      apiVersion: 'v1',
-      kind: 'Pod',
-      metadata: {
-        namespace: 'frontend',
-        name: 'nginx',
-        labels: label,
-      },
-      spec: {
-        containers: [{
-          name: 'nginx',
-          image: 'nginx:1.14-alpine',
-          resources: {
-            limits: {
-              memory: '20Mi',
-              cpu: 0.2,
-            },
-          },
-        }],
-      },
+    // Populate Volume from ConfigMap
+    const appVolume = kplus.Volume.fromConfigMap(this, 'VolumeFromConfigMap', appData);
+
+    // lets create a deployment to run a few instances of a Pod
+    const deployment = new kplus.Deployment(this, 'Deployment', {
+      metadata: { labels: label },
+      replicas: envVars.REPLICAS,
+      progressDeadline: cdk8s.Duration.seconds(120),
     });
+
+    // now we create a container that runs our app
+    const appPath = '/var/lib/app';
+    const port = 80;
+    const container = deployment.addContainer({
+      image: envVars.IMAGE_URI,
+      command: ['node', 'index.js', `${port}`],
+      port: port,
+      workingDir: appPath,
+    });
+
+    // make the app accessible to the container
+    container.mount(appPath, appVolume, {});
+
+    // finally, we expose the deployment as a load balancer service and make it run
+    deployment.exposeViaService({ serviceType: kplus.ServiceType.LOAD_BALANCER });
+
+    app.synth();
   }
 }
 
 const app = new App();
-new MyChart(app, 'hello');
+new MyChart(app, envVars.SERVICE_NAME);
 app.synth();
