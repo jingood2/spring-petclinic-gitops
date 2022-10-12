@@ -15,7 +15,7 @@ metadata:
 spec:
   minReadySeconds: 0
   progressDeadlineSeconds: 120
-  replicas: 1
+  replicas: 4
   selector:
     matchLabels:
       cdk8s.io/metadata.addr: hello-app-dev-Deployment-c8f3ed83
